@@ -7,10 +7,13 @@ from sklearn.preprocessing import MinMaxScaler
 
 def extract_summary_stats():
     # Extracts and outputs summary stats for each packet capture into
-    # output/summary_stats_training and output/summary_stats_testing in the format 
+    # output/summary_stats_training_raw, output/summary_stats_training_normalized, output/summary_stats_testing_raw, 
+    # and output/summary_stats_testing_normalized in the format:
     # [label] [numPackets] [total_data_sent] [stdev_arrival_times] [avg_inter_arrival_time] [median_arrival_time]
     # All data is normalized with min/max scaling
     # The scaler is fit and applied on the training data only, and just applied on testing data
+
+    print("Extracting Summary Stats:")
 
     print("\nTraining Data Processing:")
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -54,11 +57,17 @@ def extract_summary_stats():
     scaler = MinMaxScaler()
     normalized_train = scaler.fit_transform(training_data)
 
-    ftraining = open("output/summary_stats_training", "w")
+    ftraining = open("output/summary_stats_training_normalized", "w")
     for i, arr in enumerate(normalized_train):
         line = f"{training_labels[i]} " + " ".join(map(str, arr)) + "\n"
         ftraining.write(line)
     ftraining.close()
+
+    ftraining2 = open("output/summary_stats_training_raw", "w")
+    for i, arr in enumerate(training_data):
+        line = f"{training_labels[i]} " + " ".join(map(str, arr)) + "\n"
+        ftraining2.write(line)
+    ftraining2.close()
 
     print("\nTesting Data Processing:")
     testing_dir = os.path.join(root_dir, "testing")
@@ -96,10 +105,156 @@ def extract_summary_stats():
         testing_labels.append(re.split(r'[-.]', file_name)[0])
 
     normalized_test = scaler.transform(testing_data)
-    ftesting = open("output/summary_stats_testing", "w")
+
+    ftesting = open("output/summary_stats_testing_normalized", "w")
     for i, arr in enumerate(normalized_test):
         line = f"{testing_labels[i]} " + " ".join(map(str, arr)) + "\n"
         ftesting.write(line)
     ftesting.close()
 
-extract_summary_stats()
+    ftesting2 = open("output/summary_stats_testing_raw", "w")
+    for i, arr in enumerate(testing_data):
+        line = f"{testing_labels[i]} " + " ".join(map(str, arr)) + "\n"
+        ftesting2.write(line)
+    ftesting2.close()
+
+# Already ran - no need to rerun
+# extract_summary_stats()
+
+def extract_aggregated_data():
+    # Extracts and outputs aggregated data (data per interval) for each packet capture into
+    # output/aggregated_data_training_raw, output/aggregated_data_training_normalized, output/aggregated_data_testing_raw, 
+    # and output/aggregated_data_testing_normalized in the format:
+    # [label] [data_sent] [data_sent] ... 
+    # All data is normalized with min/max scaling
+    # The scaler is fit and applied on the training data only, and just applied on testing data
+
+    print("Extracting Aggreggated Data:")
+
+    print("\nTraining Data Processing:")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(current_dir)
+    training_dir = os.path.join(root_dir, "training")
+    training_data = []
+    training_labels = []
+    i = 0
+    numfiles = len(os.listdir(training_dir))
+    
+    bucket_interval = 0.1
+    total_window = 3.0
+
+    for file_name in sorted(os.listdir(training_dir)):
+        i += 1
+        print(f"{i}/{numfiles}")
+
+        capture_path = os.path.join(training_dir, file_name)
+
+        with pyshark.FileCapture(capture_path) as capture:
+            data_buckets = []
+            starting_time = None
+
+            for packet in capture:
+                packet_time = packet.sniff_time.timestamp()
+
+                if starting_time is None:
+                    starting_time = packet_time
+
+                # find the current bucket index
+                bucket_index = round((packet_time - starting_time) / bucket_interval)
+
+                # Cap bucket index to the total number of buckets
+                total_buckets = int(total_window / bucket_interval)
+                bucket_index = min(bucket_index, total_buckets - 1)
+
+                while len(data_buckets) <= bucket_index:
+                    data_buckets.append(0)
+
+                # add to appropriate bucket
+                data_buckets[bucket_index] += int(packet.length)
+
+                # stop if we reach the total window
+                if (packet_time - starting_time) > total_window:
+                    break
+
+            # pad with 0's if the packet capture ended early
+            while len(data_buckets) < total_buckets:
+                data_buckets.append(0)
+
+        training_data.append(data_buckets)
+        training_labels.append(re.split(r'[-.]', file_name)[0])
+
+    # Normalize and save training data
+    scaler = MinMaxScaler()
+    normalized_train = scaler.fit_transform(training_data)
+
+    with open("output/aggregated_data_training_normalized", "w") as ftraining:
+        for i, arr in enumerate(normalized_train):
+            line = f"{training_labels[i]} " + " ".join(map(str, arr)) + "\n"
+            ftraining.write(line)
+
+    with open("output/aggregated_data_training_raw", "w") as ftraining2:
+        for i, arr in enumerate(training_data):
+            line = f"{training_labels[i]} " + " ".join(map(str, arr)) + "\n"
+            ftraining2.write(line)
+
+    print("\nTesting Data Processing:")
+    testing_dir = os.path.join(root_dir, "testing")
+    testing_data = []
+    testing_labels = []
+    i = 0
+    numfiles = len(os.listdir(testing_dir))
+
+    for file_name in sorted(os.listdir(testing_dir)):
+        i += 1
+        print(f"{i}/{numfiles}")
+
+        capture_path = os.path.join(testing_dir, file_name)
+
+        with pyshark.FileCapture(capture_path) as capture:
+            data_buckets = []
+            starting_time = None
+
+            for packet in capture:
+                packet_time = packet.sniff_time.timestamp()
+
+                if starting_time is None:
+                    starting_time = packet_time
+
+                # find the current bucket index
+                bucket_index = round((packet_time - starting_time) / bucket_interval)
+
+                # Cap bucket index to the total number of buckets
+                total_buckets = int(total_window / bucket_interval)
+                bucket_index = min(bucket_index, total_buckets - 1)
+
+                while len(data_buckets) <= bucket_index:
+                    data_buckets.append(0)
+
+                # add to appropriate bucket
+                data_buckets[bucket_index] += int(packet.length)
+
+                # stop if we reach the total window
+                if (packet_time - starting_time) > total_window:
+                    break
+
+            # pad with 0's if the packet capture ended early
+            while len(data_buckets) < total_buckets:
+                data_buckets.append(0)
+
+        testing_data.append(data_buckets)
+        testing_labels.append(re.split(r'[-.]', file_name)[0])
+
+    normalized_test = scaler.transform(testing_data)
+
+    with open("output/aggregated_data_testing_normalized", "w") as ftesting:
+        for i, arr in enumerate(normalized_test):
+            line = f"{testing_labels[i]} " + " ".join(map(str, arr)) + "\n"
+            ftesting.write(line)
+
+    with open("output/aggregated_data_testing_raw", "w") as ftesting2:
+        for i, arr in enumerate(testing_data):
+            line = f"{testing_labels[i]} " + " ".join(map(str, arr)) + "\n"
+            ftesting2.write(line)
+
+# Already ran - no need to rerun
+# extract_aggregated_data()

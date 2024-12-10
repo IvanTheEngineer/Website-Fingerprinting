@@ -258,3 +258,119 @@ def extract_aggregated_data():
 
 # Already ran - no need to rerun
 # extract_aggregated_data()
+
+
+def extract_summary_stats_v2():
+    # Extracts and outputs summary stats for each packet capture into
+    # output/summary_stats_v2_training_raw, output/summary_stats_v2_training_normalized, output/summary_stats_v2_testing_raw, 
+    # and output/summary_stats_v2_testing_normalized in the format:
+    # [label] [numPackets] [total_data_sent] [TLS handshake size] [num large packets (> 1000 bytes)] [num small packets (< 100 bytes)]
+    # All data is normalized with min/max scaling
+    # The scaler is fit and applied on the training data only, and just applied on testing data
+
+    print("Extracting Summary Stats V2:")
+
+    print("\nTraining Data Processing:")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(current_dir)
+    training_dir = os.path.join(root_dir, "training")
+    training_data = []
+    training_labels = []
+    i = 0
+    numfiles = len(os.listdir(training_dir))
+    for file_name in sorted(os.listdir(training_dir)):
+        i += 1
+        print(str(i) + "/" + str(numfiles))
+
+        capture_path = os.path.join(training_dir, file_name)
+
+        with pyshark.FileCapture(capture_path) as capture:
+            total_data_sent = 0
+            numPackets = 0
+            handshake_size = 0
+            numlargepackets = 0
+            numsmallpackets = 0
+            for packet in capture:
+                total_data_sent += int(packet.length)
+                numPackets += 1
+
+                if 'TLS' in packet:
+                    tls_layer = packet.tls
+                    if hasattr(tls_layer, 'handshake_type'):
+                        handshake_size += int(packet.length)
+
+                if int(packet.length) > 1000:
+                    numlargepackets += 1
+                elif int(packet.length) < 100:
+                    numsmallpackets += 1
+        
+        
+        training_data.append([numPackets, total_data_sent, handshake_size, numlargepackets, numsmallpackets])
+        training_labels.append(re.split(r'[-.]', file_name)[0])
+
+    scaler = MinMaxScaler()
+    normalized_train = scaler.fit_transform(training_data)
+
+    ftraining = open("output/summary_stats_training_v2_normalized", "w")
+    for i, arr in enumerate(normalized_train):
+        line = f"{training_labels[i]} " + " ".join(map(str, arr)) + "\n"
+        ftraining.write(line)
+    ftraining.close()
+
+    ftraining2 = open("output/summary_stats_training_v2_raw", "w")
+    for i, arr in enumerate(training_data):
+        line = f"{training_labels[i]} " + " ".join(map(str, arr)) + "\n"
+        ftraining2.write(line)
+    ftraining2.close()
+
+    print("\nTesting Data Processing:")
+    testing_dir = os.path.join(root_dir, "testing")
+    testing_data = []
+    testing_labels = []
+    i = 0
+    numfiles = len(os.listdir(testing_dir))
+    for file_name in sorted(os.listdir(testing_dir)):
+        i += 1
+        print(str(i) + "/" + str(numfiles))
+
+        capture_path = os.path.join(testing_dir, file_name)
+
+        with pyshark.FileCapture(capture_path) as capture:
+            total_data_sent = 0
+            numPackets = 0
+            handshake_size = 0
+            numlargepackets = 0
+            numsmallpackets = 0
+            for packet in capture:
+                total_data_sent += int(packet.length)
+                numPackets += 1
+
+                if 'TLS' in packet:
+                    tls_layer = packet.tls
+                    if hasattr(tls_layer, 'handshake_type'):
+                        handshake_size += int(packet.length)
+
+                if int(packet.length) > 1000:
+                    numlargepackets += 1
+                elif int(packet.length) < 100:
+                    numsmallpackets += 1
+        
+        
+        testing_data.append([numPackets, total_data_sent, handshake_size, numlargepackets, numsmallpackets])
+        testing_labels.append(re.split(r'[-.]', file_name)[0])
+
+    normalized_test = scaler.transform(testing_data)
+
+    ftesting = open("output/summary_stats_testing_v2_normalized", "w")
+    for i, arr in enumerate(normalized_test):
+        line = f"{testing_labels[i]} " + " ".join(map(str, arr)) + "\n"
+        ftesting.write(line)
+    ftesting.close()
+
+    ftesting2 = open("output/summary_stats_testing_v2_raw", "w")
+    for i, arr in enumerate(testing_data):
+        line = f"{testing_labels[i]} " + " ".join(map(str, arr)) + "\n"
+        ftesting2.write(line)
+    ftesting2.close()
+
+extract_summary_stats_v2()

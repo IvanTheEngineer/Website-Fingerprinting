@@ -65,3 +65,32 @@ print("\nSummary Stats Extraction Model Results:")
 print("(Features are numPackets, total_data_sent, stdev_arrival_times, avg_inter_arrival_time, and median_arrival_time)")
 print(f"Validation Loss: {loss:.4f}")
 print(f"Validation Accuracy: {accuracy:.4f}")
+
+# Summary Stats Feature Model
+testing_file = "output/summary_stats_testing_v2_normalized"
+model_file = "trained_model_summary_stats_v2.keras"
+columns = ["label", "numPackets", "total_data_sent", "TLS_handshake_size", "num_large_packets", "num_small_packets"]
+data_testing = pd.read_csv(testing_file, sep=" ", header=None, names=columns)
+
+values_testing = data_testing.iloc[:, 1:].values
+labels_testing = data_testing.iloc[:, 0].values
+
+label_encoder = LabelEncoder()
+labels_testing = label_encoder.fit_transform(labels_testing)
+labels_testing = to_categorical(labels_testing)
+
+values_testing = np.array(values_testing)
+labels_testing = np.array(labels_testing)
+
+if os.path.exists(model_file):
+    model = load_model(model_file)
+    model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+else:
+    print(f"model {model_file} not found")
+    exit()
+
+loss, accuracy = model.evaluate(values_testing, labels_testing, verbose=0)
+print("\nSummary Stats V2 Extraction Model Results:")
+print("(Features are numPackets, total_data_sent, TLS_handshake_size, num_large_packets (> 1000 bytes), and num_small_packets (< 100 bytes))")
+print(f"Validation Loss: {loss:.4f}")
+print(f"Validation Accuracy: {accuracy:.4f}")

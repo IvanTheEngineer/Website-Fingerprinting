@@ -114,6 +114,11 @@ duration = 2
 folders = ["training", "testing"]
 capturesPerSite = [4, 1]
 
+# Ensure the folders exist
+for folder in folders:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
 def capture_packets(interface, output_file):
     capture = pyshark.LiveCapture(interface=interface, output_file=output_file)
     for packet in capture.sniff_continuously():

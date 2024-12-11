@@ -1,104 +1,60 @@
 import pyshark
 import numpy as np
 import os
+import re
 from tqdm import tqdm
-import asyncio
 
-DATA_DIR = 'training'  # or 'testing', depending on which dataset you're processing
+DATA_DIR = 'training'  # Change to 'testing' as needed
 
 def process_pcap(file_path):
     try:
         print(f"Processing file: {file_path}")
-
-        # Use 'with' statement to ensure the capture is properly closed
         with pyshark.FileCapture(file_path, keep_packets=False) as cap:
-            packet_times = []
-            packet_sizes = []
-            packet_directions = []
-
-            # Replace with your actual local IP address
-            LOCAL_IP = '192.168.0.15'
-
-            packet_count = 0
+            numPackets = 0
+            total_size = 0
+            max_size = 0
+            large_packet_count = 0
+            unique_ips = set()
 
             for packet in cap:
-                packet_count += 1
-                try:
-                    # Get packet timestamp
-                    timestamp = float(packet.sniff_timestamp)
-                    packet_times.append(timestamp)
+                # Each packet has a length field
+                size = int(packet.length)
+                numPackets += 1
+                total_size += size
+                if size > max_size:
+                    max_size = size
+                if size > 1000:
+                    large_packet_count += 1
 
-                    # Get packet size
-                    size = int(packet.length)
-                    packet_sizes.append(size)
+                # Extract IP addresses if available
+                # Note: Not all packets may have an IP layer (e.g., ARP),
+                # so we check first.
+                if hasattr(packet, 'ip'):
+                    src_ip = packet.ip.src
+                    dst_ip = packet.ip.dst
+                    unique_ips.add(src_ip)
+                    unique_ips.add(dst_ip)
 
-                    # Determine packet direction
-                    if 'IP' in packet:
-                        src = packet.ip.src
-                        dst = packet.ip.dst
-                    else:
-                        continue  # Skip if no IP layer
-
-                    if src == LOCAL_IP:
-                        packet_directions.append(1)   # Outgoing
-                    else:
-                        packet_directions.append(-1)  # Incoming
-
-                except Exception as e:
-                    print(f"Error processing packet {packet_count} in {file_path}: {e}")
-                    continue
-
-            print(f"Processed {packet_count} packets in {file_path}")
-
-            if not packet_times:
-                print(f"No packets processed in {file_path}.")
+            if numPackets == 0:
+                # No packets in this capture
                 return None
 
-            # Ensure packet_times has at least two timestamps for np.diff
-            if len(packet_times) < 2:
-                print(f"Not enough packet times for inter-arrival time calculation in {file_path}.")
-                return None
+            avg_packet_size = total_size / numPackets
+            fraction_large_packets = large_packet_count / numPackets
+            unique_ip_count = len(unique_ips)
 
-            # Calculate inter-packet arrival times
-            inter_arrival_times = np.diff(packet_times)
-
-            # Define intervals
-            TIME_INTERVAL = 0.5
-            MAX_INTERVALS = 20
-            start_time = packet_times[0]
-            intervals = np.arange(start_time, start_time + TIME_INTERVAL * MAX_INTERVALS, TIME_INTERVAL)
-            num_packets_per_interval = np.zeros(MAX_INTERVALS)
-            data_sent_per_interval = np.zeros(MAX_INTERVALS)
-            data_received_per_interval = np.zeros(MAX_INTERVALS)
-
-            for i in range(len(packet_times)):
-                interval_index = int((packet_times[i] - start_time) / TIME_INTERVAL)
-                if 0 <= interval_index < MAX_INTERVALS:
-                    num_packets_per_interval[interval_index] += 1
-                    if packet_directions[i] == 1:
-                        data_sent_per_interval[interval_index] += packet_sizes[i]
-                    else:
-                        data_received_per_interval[interval_index] += packet_sizes[i]
-                else:
-                    print(f"Interval index {interval_index} out of bounds for {file_path}")
-                    continue
-
-            # Aggregate statistics
             features = {
-                'num_packets_per_interval': num_packets_per_interval,
-                'data_sent_per_interval': data_sent_per_interval,
-                'data_received_per_interval': data_received_per_interval,
-                'mean_inter_arrival_time': np.mean(inter_arrival_times),
-                'std_inter_arrival_time': np.std(inter_arrival_times),
+                'numPackets': numPackets,
+                'avg_packet_size': avg_packet_size,
+                'max_packet_size': max_size,
+                'fraction_large_packets': fraction_large_packets,
+                'unique_ip_count': unique_ip_count
             }
 
             return features
-
     except Exception as e:
         print(f"Error processing {file_path}: {e}")
         return None
-
-
 
 def extract_features_from_directory(data_dir):
     feature_list = []
@@ -109,15 +65,15 @@ def extract_features_from_directory(data_dir):
             file_path = os.path.join(data_dir, file_name)
             features = process_pcap(file_path)
             if features is not None:
-                # Extract website label from file name
-                label = file_name.split('-')[0]
-                # Combine all features into a single array
-                feature_array = np.concatenate([
-                    features['num_packets_per_interval'],
-                    features['data_sent_per_interval'],
-                    features['data_received_per_interval'],
-                    [features['mean_inter_arrival_time']],
-                    [features['std_inter_arrival_time']]
+                # Extract label from file name using regex
+                label = re.split(r'[-.]', file_name)[0]
+
+                feature_array = np.array([
+                    features['numPackets'],
+                    features['avg_packet_size'],
+                    features['max_packet_size'],
+                    features['fraction_large_packets'],
+                    features['unique_ip_count']
                 ])
                 print(f"Feature array shape: {feature_array.shape}")
                 feature_list.append(feature_array)

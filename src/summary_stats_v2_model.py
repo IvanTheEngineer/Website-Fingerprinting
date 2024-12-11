@@ -9,13 +9,19 @@ from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 
 # Load model, training and testing datasets
-# Datasets for summary stats v2 dataset were already normalized using min-max so it doesn't need to be done again
+# Datasets for summary stats v3 dataset were already normalized using min-max so it doesn't need to be done again
 training_file = "output/summary_stats_training_v2_normalized"
 testing_file = "output/summary_stats_testing_v2_normalized"
-model_file = "trained_model_summary_stats_v2.keras"
+
+# new model file
+model_file = "trained_model_summary_stats_v3.keras"
 columns = ["label", "numPackets", "total_data_sent", "TLS_handshake_size", "num_large_packets", "num_small_packets"]
 data_training = pd.read_csv(training_file, sep=" ", header=None, names=columns)
 data_testing = pd.read_csv(testing_file, sep=" ", header=None, names=columns)
+
+# trying with just the numPackets and total_data_sent
+data_training = data_training.drop(columns=["TLS_handshake_size", "num_large_packets", "num_small_packets"])
+data_testing = data_testing.drop(columns=["TLS_handshake_size", "num_large_packets", "num_small_packets"])
 
 # Separate features and labels for training and testing
 values_training = data_training.iloc[:, 1:].values

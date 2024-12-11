@@ -8,6 +8,8 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 
+print("\nEach model is a keras sequential model which was ran with 150 epochs each")
+
 # Aggregated Data Feature Model
 testing_file = "output/aggregated_data_testing_normalized"
 model_file = "trained_model_aggregated_data.keras"

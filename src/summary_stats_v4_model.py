@@ -8,23 +8,35 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 
-# Load model, training and testing datasets
-# Datasets for summary stats v3 dataset were already normalized using min-max so it doesn't need to be done again
-training_file = "output/summary_stats_training_v2_normalized"
-testing_file = "output/summary_stats_testing_v2_normalized"
-
 # new model file
-model_file = "trained_model_summary_stats_v2.keras"
-columns = ["label", "numPackets", "total_data_sent", "TLS_handshake_size", "num_large_packets", "num_small_packets"]
-data_training = pd.read_csv(training_file, sep=" ", header=None, names=columns)
-data_testing = pd.read_csv(testing_file, sep=" ", header=None, names=columns)
+model_file = "trained_model_summary_stats_v4.keras"
+
+# File paths and column definitions for the two datasets
+file_1_training = "output/summary_stats_training_v2_normalized"
+file_1_testing = "output/summary_stats_testing_v2_normalized"
+columns_1 = ["label", "numPackets", "total_data_sent", "TLS_handshake_size", "num_large_packets", "num_small_packets"]
+
+file_2_training = "output/summary_stats_training_normalized"
+file_2_testing = "output/summary_stats_testing_normalized"
+columns_2 = ["label", "numPackets", "total_data_sent", "stdev_arrival_times", "avg_inter_arrival_time", "median_arrival_time"]
+
+# Load both datasets
+data_1_training = pd.read_csv(file_1_training, sep=" ", header=None, names=columns_1)
+data_1_testing = pd.read_csv(file_1_testing, sep=" ", header=None, names=columns_1)
+
+data_2_training = pd.read_csv(file_2_training, sep=" ", header=None, names=columns_2)
+data_2_testing = pd.read_csv(file_2_testing, sep=" ", header=None, names=columns_2)
+
+# Merge the datasets
+final_training = pd.concat([data_1_training, data_2_training.iloc[:, 3:]], axis=1)
+final_testing = pd.concat([data_1_testing, data_2_testing.iloc[:, 3:]], axis=1)
 
 # Separate features and labels for training and testing
-values_training = data_training.iloc[:, 1:].values
-labels_training = data_training.iloc[:, 0].values
+values_training = final_training.iloc[:, 1:].values
+labels_training = final_training.iloc[:, 0].values
 
-values_testing = data_testing.iloc[:, 1:].values
-labels_testing = data_testing.iloc[:, 0].values
+values_testing = final_testing.iloc[:, 1:].values
+labels_testing = final_testing.iloc[:, 0].values
 
 # print(pd.Series(labels_training).value_counts())
 

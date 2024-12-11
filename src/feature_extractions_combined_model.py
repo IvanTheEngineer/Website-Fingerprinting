@@ -8,23 +8,55 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 
+
+model_file = "trained_model_all_extractions_combined.keras"
 # Load model, training and testing datasets
-# Datasets for summary stats dataset were already normalized using min-max so it doesn't need to be done again
-training_file = "output/summary_stats_training_normalized"
-testing_file = "output/summary_stats_testing_normalized"
-model_file = "trained_model_summary_stats.keras"
-columns = ["label", "numPackets", "total_data_sent", "stdev_arrival_times", "avg_inter_arrival_time", "median_arrival_time"]
-data_training = pd.read_csv(training_file, sep=" ", header=None, names=columns)
-data_testing = pd.read_csv(testing_file, sep=" ", header=None, names=columns)
+# Datasets for summary stats v2 dataset were already normalized using min-max so it doesn't need to be done again
+files_and_columns = [
+    (
+        "output/summary_stats_training_v2_normalized",
+        "output/summary_stats_testing_v2_normalized",
+        ["label", "numPackets", "total_data_sent", "TLS_handshake_size", "num_large_packets", "num_small_packets"]
+    ),
+    (
+        "output/summary_stats_training_normalized",
+        "output/summary_stats_testing_normalized",
+        ["label", "numPackets", "total_data_sent", "stdev_arrival_times", "avg_inter_arrival_time", "median_arrival_time"]
+    ),
+    (
+        "output/aggregated_data_training_normalized",
+        "output/aggregated_data_testing_normalized",
+        ["label"] + [f"data{i+1}" for i in range(30)]
+    )
+]
 
-# Separate features and labels for training and testing
-values_training = data_training.iloc[:, 1:].values
-labels_training = data_training.iloc[:, 0].values
+training_dfs = []
+testing_dfs = []
 
-values_testing = data_testing.iloc[:, 1:].values
-labels_testing = data_testing.iloc[:, 0].values
+# combining all 3 feature extractions
+for training_file, testing_file, columns in files_and_columns:
+    training_df = pd.read_csv(training_file, sep=" ", header=None, names=columns)
+    testing_df = pd.read_csv(testing_file, sep=" ", header=None, names=columns)
+    
+    training_dfs.append(training_df)
+    testing_dfs.append(testing_df)
 
-# print(pd.Series(labels_train).value_counts())
+combined_training = pd.concat([df.iloc[:, 1:] for df in training_dfs], axis=1)
+combined_training.insert(0, "label", training_dfs[0]["label"])
+
+combined_testing = pd.concat([df.iloc[:, 1:] for df in testing_dfs], axis=1)
+combined_testing.insert(0, "label", testing_dfs[0]["label"])
+
+#combined_testing.to_csv("combined_testing.csv", index=False)
+#exit()
+
+values_training = combined_training.iloc[:, 1:].values
+labels_training = combined_training.iloc[:, 0].values
+
+values_testing = combined_testing.iloc[:, 1:].values
+labels_testing = combined_testing.iloc[:, 0].values
+
+# print(pd.Series(labels_training).value_counts())
 
 # Split training dataset in 3:1 ratio to training and validation
 # validation serves as an independent dataset during training

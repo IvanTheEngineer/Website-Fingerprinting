@@ -68,7 +68,7 @@ else:
     model.compile(optimizer=Adam(learning_rate=0.001), loss="categorical_crossentropy", metrics=["accuracy"])
 
 # Train model
-history = model.fit(values_training, labels_training, validation_data=(values_validation, labels_validation), epochs=100, batch_size=32, verbose=1)
+history = model.fit(values_training, labels_training, validation_data=(values_validation, labels_validation), epochs=150, batch_size=32, verbose=1)
 
 # Evaluate on testing dataset
 loss, accuracy = model.evaluate(values_testing, labels_testing, verbose=0)

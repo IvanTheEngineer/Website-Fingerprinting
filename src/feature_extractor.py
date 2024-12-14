@@ -119,7 +119,7 @@ def extract_summary_stats():
     ftesting2.close()
 
 # Already ran - no need to rerun
-# extract_summary_stats()
+extract_summary_stats()
 
 def extract_aggregated_data():
     # Extracts and outputs aggregated data (data per interval) for each packet capture into
@@ -257,7 +257,7 @@ def extract_aggregated_data():
             ftesting2.write(line)
 
 # Already ran - no need to rerun
-# extract_aggregated_data()
+extract_aggregated_data()
 
 
 def extract_summary_stats_v2():

@@ -16,4 +16,6 @@ Training (from scratch)
 Evaluation
 1. Run eval_acc_comparison.py to show all accuracies and losses
 
-### (Consult Report PDF for detailed implemetation details and results analysis)
+### (See Report PDF below for detailed implemetation details and results analysis)
+[Final Project Report](Final%20Project%20(Website%20Fingerprinting%20and%20ML)%20Report.pdf)
+
